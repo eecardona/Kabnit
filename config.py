@@ -1,5 +1,5 @@
 # User Details
-USERNAME = "a"
+USERNAME = None
 
 # Database details
-DB_NAME = "a202610311715"
+DB_NAME = None

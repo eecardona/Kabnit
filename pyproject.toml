@@ -1,11 +1,10 @@
 [project]
 name = "Kabnit"
 version = "0.1.0"
-description = "Add your description here"
+description = "Run a local postgres server to manage an inventory for your home, kitchen, or garage."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "psycopg[binary]>=3.3.6",
     "pyqt6>=6.12.0",
-    "tabulate>=0.10.0",
 ]
