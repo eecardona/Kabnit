@@ -48,3 +48,56 @@ def config_update(setting, update):
 
     with open(file="config.py", mode="w") as f:
         f.write(content)
+
+def pull_inventory():
+    try:
+        with psycopg.connect(f"dbname={config.DB_NAME} user=postgres") as conn:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                    item_name,
+                    brand_name,
+                    amount || ' ' || units AS amount,
+                    location,
+                    expiration_date
+                    FROM inventory
+                    WHERE amount > 0
+                    ;
+                    """)
+                logger.info("Returned Current Inventory")
+                rows = cur.fetchall()
+                headers = [description[0] for description in cur.desctription]
+                return rows, headers
+    except Exception as e:
+        logger.info(f"Unable to read inventory: {e}")
+        print(f"Error: {e}")
+
+def insert_sql_file(path_to_file):
+    try:
+        logger.info("Attempting to connect to inventory database")
+        conn = psycopg.connect(f"dbname={config.DB_NAME} user=postgres")
+        logger.info("Connected to database")
+        cur = conn.cursor()
+        cur.execute(open(file=path_to_file).read())
+        conn.commit()
+        logger.info('File inserted into table "inventory"')
+    except Exception as e:
+        logger.error(f"Insert failed: {e}")
+        print(f"Error: {e}")
+
+def insert_form_data(rows):
+    try:
+        with psycopg.connect(f"dbname={config.DB_NAME} user=postgres") as conn:
+            with conn.cursor() as cur:
+                cur.executemany(
+                    "INSERT INTO inventory (item_name, brand_name, amount, units, location, expiration_date, barcode, price_paid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    rows
+                )
+                conn.commit()
+                logger.info(f"Successfully inserted {len(rows)} rows")
+                return True
+    except Exception as e:
+        logger.error(f"Insert failed: {e}")
+        print(f"Error: {e}")
+        return False
