@@ -67,7 +67,7 @@ def pull_inventory():
                     """)
                 logger.info("Returned Current Inventory")
                 rows = cur.fetchall()
-                headers = [description[0] for description in cur.desctription]
+                headers = [description[0] for description in cur.description]
                 return rows, headers
     except Exception as e:
         logger.info(f"Unable to read inventory: {e}")

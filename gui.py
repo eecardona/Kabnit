@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QLineEdit
-from PyQt6.QtCore import Qt, QAbstractTableModel
+from PyQt6.QtWidgets import QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit
+from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal
 import PyQt6.QtGui
 import logging
 import bloolib
@@ -19,7 +19,12 @@ class PostgresTableModel(QAbstractTableModel):
         return len(self.headers)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        if role == Qt.ItemDataRole.DisplayRole and orienation == Qt.Orientation.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self.data_rows[index.row()][index.column()]
+        return None
+
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return self.headers[section]
         return None
 
@@ -59,27 +64,19 @@ class MainWindow(QMainWindow):
             print(f"Error: {e}")
 
     def open_add_items_form(self):
-        if self.add_form is None:
-            self.add_form = addItemsForm()
-            self.add_form.back_button.clicked.connect(self.show)
-        self.add_form.show()
-        self.hide()
+        self.add_form = addItemsForm()
+        self.add_form.closed.connect(self.on_form_closed)
+        self. add_form.show()
 
-    def on_submit_form(self):
-        rows = self.get_form_data()
-
-        if bloolib.insert_form_data(rows):
-            logger.info("Data inserted successfully!")
-#            self.clear_form()
-        else:
-            print("Insert Failed")
-
-#    def clear_form():
-#        return "not done yet brother"
+    def on_form_closed(self):
+        self.add_form = None
+        self.show()
 
 class addItemsForm(QWidget):
+    closed = pyqtSignal()
     def __init__(self):
         super().__init__()
+        self.rows = []
         self.setWindowTitle("Add Items Form")
 
         self.form_layout = QFormLayout()
@@ -93,23 +90,50 @@ class addItemsForm(QWidget):
         self.form_layout.addWidget(self.add_button)
 
         self.submit_button = QPushButton("Submit")
-        self.submit_button.clicked.connect(self.submit)
+        self.submit_button.clicked.connect(self.on_submit_form)
         self.form_layout.addWidget(self.submit_button)
 
 
         self.back_button = QPushButton("Cancel")
-        self.back_button.clicked.connect(self.close)
+        self.back_button.clicked.connect(self.cancel)
         self.form_layout.addWidget(self.back_button)
-
-        self.setLayout(self.form_layout)
 
     def add_row(self):
         hbox = QHBoxLayout()
-        for placeholder in ["Item name", "Brand name", "Amount", "Units", "Location", "Expiration Date"]:
+        fields = []
+        for placeholder in ["Item name", "Brand name", "Amount", "Units", "Location", "Expiration date", "Price paid"]:
             line = QLineEdit()
             line.setPlaceholderText(placeholder)
+            fields.append(line)
             hbox.addWidget(line)
+        self.rows.append(fields)
         self.form_layout.insertRow(self.form_layout.count() - 3, hbox)
 
     def submit(self):
-        print("Command to add Items into Table Inventory")
+        rows = []
+        for row in self.rows:
+            rows.append((
+                row[0].text(), #Item name
+                row[1].text() or None, #Brand name
+                row[2].text(), #Amount
+                row[3].text(), #Units
+                row[4].text(), #Location
+                None,         #Barcode
+                row[5].text() or None, #Expiration date
+                row[6].text() or None #Price paid
+            ))
+        return rows
+
+    def on_submit_form(self):
+        rows = self.submit()
+
+        if bloolib.insert_form_data(rows):
+            logger.info("Data inserted successfully!")
+            self.closed.emit()
+            self.close()
+        else:
+            print("Data insert failed")
+
+    def cancel(self):
+        self.closed.emit()
+        self.close()
