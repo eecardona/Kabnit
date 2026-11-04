@@ -1,12 +1,25 @@
 from shutil import copyfile
 from pathlib import Path
+import psycopg
 import logging
+import config
 
 logger = logging.getLogger(__name__)
 
 def factory_reset():
-    default_config = Path("/default/defaultConfig.py")
+    default_config = Path("./default/defaultConfig.py")
     current_config = Path("config.py")
+
+    # Delete existing Database
+    try:
+        with psycopg.connect("dbname=postgres user=postgres") as conn:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute(f"DROP DATABASE IF EXISTS {config.DB_NAME};")
+                logger.info(f"Dropped Database {config.DB_NAME}")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        print(f"Error: {e}")
 
     if not default_config.exists():
         logger.error(f"Default config not found: {default_config}")

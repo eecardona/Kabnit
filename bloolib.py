@@ -21,8 +21,8 @@ def create_table():
         with psycopg.connect(f"dbname={config.DB_NAME} user=postgres") as conn:
             conn.autocommit = True
             with conn.cursor() as cur:
-                cur.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {config.DB_NAME} (
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS inventory (
                         id serial PRIMARY KEY,
                         item_name VARCHAR(255) NOT NULL,
                         brand_name VARCHAR(255),
@@ -56,11 +56,11 @@ def pull_inventory():
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT
-                    item_name,
-                    brand_name,
-                    amount || ' ' || units AS amount,
-                    location,
-                    expiration_date
+                    item_name AS Item,
+                    brand_name AS Brand,
+                    amount || ' ' || units AS Amount,
+                    Location,
+                    expiration_date AS "Expiration Date"
                     FROM inventory
                     WHERE amount > 0
                     ;
