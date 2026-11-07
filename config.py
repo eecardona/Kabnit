@@ -1,5 +1,5 @@
 # User Details
-USERNAME = "Emmanuel"
+USERNAME = "EEEEEEEE"
 
 # Database details
-DB_NAME = "emmanuel202611041707"
+DB_NAME = "eeeeeeee202611070859"

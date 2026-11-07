@@ -1,4 +1,6 @@
-from PyQt6.QtWidgets import QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit
+from ctypes import alignment
+
+from PyQt6.QtWidgets import QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QLabel
 from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal
 import PyQt6.QtGui
 import logging
@@ -72,8 +74,10 @@ class MainWindow(QMainWindow):
         self.add_form = None
         self.show()
 
+
 class addItemsForm(QWidget):
     closed = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.rows = []
@@ -82,21 +86,13 @@ class addItemsForm(QWidget):
         self.form_layout = QFormLayout()
         self.setLayout(self.form_layout)
 
+        self.add_display = QLabel("Add Item Details below")
+        self.add_display.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.form_layout.addWidget(self.add_display)
+
+        self.button_row()
         for i in range(3):
             self.add_row()
-
-        self.add_button = QPushButton("Add Row")
-        self.add_button.clicked.connect(self.add_row)
-        self.form_layout.addWidget(self.add_button)
-
-        self.submit_button = QPushButton("Submit")
-        self.submit_button.clicked.connect(self.on_submit_form)
-        self.form_layout.addWidget(self.submit_button)
-
-
-        self.back_button = QPushButton("Cancel")
-        self.back_button.clicked.connect(self.cancel)
-        self.form_layout.addWidget(self.back_button)
 
     def add_row(self):
         hbox = QHBoxLayout()
@@ -107,7 +103,26 @@ class addItemsForm(QWidget):
             fields.append(line)
             hbox.addWidget(line)
         self.rows.append(fields)
-        self.form_layout.insertRow(self.form_layout.count() - 3, hbox)
+        self.form_layout.insertRow(self.form_layout.count() - 1, hbox)
+
+    # Not really sure if this is the best way to do this but its similar to form rows solution and keeps it contained idk.
+    def button_row(self):
+        bbox = QHBoxLayout()
+        bbox.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.add_button = QPushButton("Add Row")
+        self.add_button.clicked.connect(self.add_row)
+        bbox.addWidget(self.add_button)
+
+        self.back_button = QPushButton("Cancel")
+        self.back_button.clicked.connect(self.cancel)
+        bbox.addWidget(self.back_button)
+
+        self.submit_button = QPushButton("Submit")
+        self.submit_button.clicked.connect(self.on_submit_form)
+        bbox.addWidget(self.submit_button)
+
+        self.form_layout.addRow(bbox)
 
     def submit(self):
         rows = []
