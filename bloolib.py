@@ -1,3 +1,4 @@
+from operator import truediv
 import psycopg
 import logging
 import config
@@ -6,15 +7,34 @@ import re
 
 logger = logging.getLogger(__name__)
 
+def check_user():
+    if config.USERNAME == None:
+        set_user()
+
 def create_db():
     try:
-        with psycopg.connect("dbname=postgres user=postgres") as conn:
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute(f"CREATE DATABASE {config.DB_NAME};")
+        with psycopg.connect("dbname=postgres user=postgres") as admin_conn:
+            admin_conn.autocommit = True
+            with admin_conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (f"{config.DB_NAME}",))
+                if cur.fetchone() is None:
+                    admin_conn.autocommit = True
+                    with admin_conn.cursor() as cur:
+                        cur.execute(f'CREATE DATABASE "{config.DB_NAME}"')
                 logger.info(f'Database "{config.DB_NAME}" created on postgres server')
     except Exception as e:
         logger.info(f"Failure creating initial database: {e}")
+
+# Updates setting permanantly in config.py.
+# Ensure you change value locally with config.{setting} = {update}
+def config_update(setting, update):
+    with open(file="config.py") as f:
+        content = f.read()
+
+    content = re.sub(rf'{setting}\s*=.*', f'{setting} = "{update}"', content)
+
+    with open(file="config.py", mode="w") as f:
+        f.write(content)
 
 def create_table():
     try:
@@ -35,19 +55,31 @@ def create_table():
                         );
                         """)
                 logger.info('Table "inventory" created on postgres server')
+                return True
     except Exception as e:
-        logger.info(f"Failure creating initial database: {e}")
+        logger.info(f"Failure creating table: {e}")
+        return False
 
-# Updates setting permanantly in config.py.
-# Ensure you change value locally with config.{setting} = {update}
-def config_update(setting, update):
-    with open(file="config.py") as f:
-        content = f.read()
+def ensure_db():
+    try:
+        if config.DB_NAME is None:
+            config.DB_NAME = "kabnit"
+            config_update("DB_NAME", config.DB_NAME)
 
-    content = re.sub(rf'{setting}\s*=.*', f'{setting} = "{update}"', content)
+        create_db()
+        return create_table()
+    except Exception as e:
+        logger.exception(f"ensure_db failed: {e}")
+        return False
 
-    with open(file="config.py", mode="w") as f:
-        f.write(content)
+def set_user():
+    print("Welcome to KabNit! Please enter a username to identify you:")
+    username = input()
+    config_update("USERNAME",f"{username}")
+    config.USERNAME = username
+    logger.info(f"User {username} saved as owner")
+    print(f"Thanks {username}")
+
 
 def pull_inventory():
     try:
@@ -101,3 +133,13 @@ def insert_form_data(rows):
         logger.error(f"Insert failed: {e}")
         print(f"Error: {e}")
         return False
+
+def search(text):
+    dsn = f"dbname={config.DB_NAME} user=postgres"
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT item_name FROM inventory WHERE item_name ILIKE %s",
+                (f"%{text}%",)
+            )
+            return cur.fetchall()

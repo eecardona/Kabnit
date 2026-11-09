@@ -1,10 +1,11 @@
 from ctypes import alignment
-
-from PyQt6.QtWidgets import QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QLabel
+from pathlib import Path
+from PyQt6.QtWidgets import QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QLabel, QTableWidget
 from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal
-import PyQt6.QtGui
+from PyQt6.QtGui import QFont, QFontDatabase, QPixmap
 import logging
 import bloolib
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,45 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("KabNit: Self-Hosted Inventory Management")
         self.setGeometry(100, 100, 800, 600)
 
+        font_id = QFontDatabase.applicationFontFamilies(
+            QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "DEMO Broncks.ttf"))
+        )
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout()
+
+        # Title bar Contents
+        title_bar = QHBoxLayout()
+
+        self.logo = QLabel()
+        pixmap = QPixmap(str(config.BASE_DIR / "static" / "logo.png"))
+        self.logo.setPixmap(pixmap.scaledToHeight(32, Qt.TransformationMode.SmoothTransformation))
+        title_bar.addWidget(self.logo)
+
+        self.app_name = QLabel("KabNit")
+        self.app_name.setFixedHeight(46)
+        self.app_name.setContentsMargins(0, 8, 0, 0)
+        self.app_name.setFont(QFont("Broncks DEMO", 28, QFont.Weight.Bold))
+        self.app_name.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft)
+        title_bar.addWidget(self.app_name)
+
+        title_bar.addStretch()
+
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("Search by item name")
+        title_bar.addWidget(self.search_bar)
+
+        self.search_button = QPushButton("Search")
+        self.search_button.clicked.connect(self.do_search)
+        title_bar.addWidget(self.search_button)
+
+        layout.addLayout(title_bar)
+
+        self.search_results = QTableWidget()
+        self.search_results.setColumnCount(1)
+        self.search_results.setHorizontalHeaderLabels(["Item Name"])
+        layout.addWidget(self.search_results)
 
         self.pull_button = QPushButton("Pull Inventory")
         self.pull_button.clicked.connect(self.on_pull_inventory)
@@ -54,6 +91,17 @@ class MainWindow(QMainWindow):
 
         central_widget.setLayout(layout)
 
+    def do_search(self):
+        text = self.search_bar.text().strip()
+        self.search_results.setRowCount(0)
+        if not text:
+            return
+
+        rows = bloolib.search(text)
+
+        self.search_results.setRowCount(len(rows))
+        for i, (name,) in enumerate(rows):
+            self.search_results.setItem(i, 0, QTableWidgetItem(name))
 
     def on_pull_inventory(self):
         try:
@@ -73,6 +121,8 @@ class MainWindow(QMainWindow):
     def on_form_closed(self):
         self.add_form = None
         self.show()
+
+
 
 
 class addItemsForm(QWidget):

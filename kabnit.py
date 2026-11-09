@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import QApplication
-from datetime import datetime
+from PyQt6.QtGui import QFontDatabase, QPalette, QColor
+from bloolib import check_user, ensure_db
 import logging
 import config
-import bloolib
 import gui
 import sys
 
@@ -15,22 +15,31 @@ logger = logging.getLogger(__name__)
 
 app = QApplication(sys.argv)
 
+#Style
+btn_color = app.palette().color(QPalette.ColorRole.Button)
+
+hover_color = btn_color.darker(100)
+pressed_color = btn_color.darker(150)
+
+app.setStyleSheet(f"""
+    QPushButton:hover {{
+        background-color: {hover_color.name()};
+    }}
+    QPushButton:pressed {{
+        background-color: {pressed_color.name()};
+    }}
+""")
+
 def main():
-    if config.USERNAME == None:
-        print("Welcome to KabNit! Please enter a username to identify you:")
-        username = input()
-        bloolib.config_update("USERNAME",f"{username}")
-        config.USERNAME = username
-        logger.info(f"User {username} saved as owner")
-        print(f"Thanks {username}")
-    if config.DB_NAME == None:
-        time = datetime.now().strftime("%Y%m%d%H%M")
-        db_update = (f'{config.USERNAME}{time}').lower()
-        config.DB_NAME = db_update
-        bloolib.config_update("DB_NAME", f"{db_update}")
-        logger.info("New DB_NAME set")
-        bloolib.create_db()
-        bloolib.create_table()
+    check_user()
+    if not ensure_db():
+        sys.exit(1)
+
+    font_id = QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "DEMO Broncks.ttf"))
+    if font_id <0:
+        logger.error("ERROR: Failed to load font")
+    else:
+        font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
 
     window = gui.MainWindow()
     window.show()
