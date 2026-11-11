@@ -27,7 +27,7 @@ def warning_postgres():
     if response == QMessageBox.StandardButton.Ok:
         bloolib.start_postgres_server()
     else:
-        app.quit()  # Close the application if the user cancels
+        app.quit()
 
 
 
@@ -161,6 +161,7 @@ class addItemsForm(QWidget):
     def __init__(self):
         super().__init__()
         self.rows = []
+        self.row_layouts = []
         self.setWindowTitle("Add Items Form")
 
         self.form_layout = QFormLayout()
@@ -183,11 +184,30 @@ class addItemsForm(QWidget):
             hbox.addWidget(line)
         self.form_layout.insertRow(self.form_layout.count() - 1, hbox)
         self.rows.append(fields)
+        self.row_layouts.append(hbox)
+
+    def remove_row(self):
+        if not self.rows:
+            return
+
+        fields = self.rows.pop()
+        hbox = self.row_layouts.pop()
+
+        for widget in fields:
+            hbox.removeWidget(widget)
+            widget.hide()
+            widget.deleteLater()
+
+        self.form_layout.removeRow(hbox)
 
     # Not really sure if this is the best way to do this but its similar to form rows solution and keeps it contained idk.
     def button_row(self):
         bbox = QHBoxLayout()
         bbox.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.remove_button = QPushButton("Remove Row")
+        self.remove_button.clicked.connect(lambda: self.remove_row())
+        bbox.addWidget(self.remove_button)
 
         self.add_button = QPushButton("Add Row")
         self.add_button.clicked.connect(self.add_row)
@@ -227,10 +247,10 @@ class addItemsForm(QWidget):
                 break
         if valid:
             rows = self.submit()
-        if bloolib.insert_form_data(rows):
-                logger.info("Data inserted successfully!")
-                self.closed.emit()
-                self.close()
+            if bloolib.insert_form_data(rows):
+                    logger.info("Data inserted successfully!")
+                    self.closed.emit()
+                    self.close()
         else:
             QMessageBox.warning(self, "Database Error", "Failed to insert data.")
             logger.error("Database error, Failed to insert data")

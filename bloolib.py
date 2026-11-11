@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def postgres_check():
     try:
         connection = psycopg.connect("dbname=postgres user=postgres")
-        print("Connection to PostgreSQL server successful")
+        logger.info("Connection to PostgreSQL server successful")
         connection.close()
         return True
     except Exception as e:
@@ -21,7 +21,7 @@ def postgres_check():
 def start_postgres_server():
     try:
         subprocess.run(['sudo', 'systemctl', 'start', 'postgresql'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("PostgreSQL server started successfully.")
+        logger.info("PostgreSQL server started successfully.")
     except Exception as e:
         logger.error(f"Error occured: {e}")
 
