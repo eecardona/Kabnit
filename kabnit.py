@@ -1,10 +1,11 @@
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QFontDatabase, QPalette, QColor
-from bloolib import check_user, ensure_db
+from PyQt6.QtGui import QFontDatabase, QPalette
+from bloolib import check_user, ensure_db, postgres_check
 import logging
 import config
 import gui
 import sys
+import os
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,9 +32,16 @@ app.setStyleSheet(f"""
 """)
 
 def main():
-    check_user()
-    if not ensure_db():
-        sys.exit(1)
+    os.environ["QT_QPA_PLATFORMTHEME"] = "kde"  # Plan to change this to a sys call to identify user session and set theme for them.
+
+    if not postgres_check():
+        print("Check returned False")
+        gui.warning_postgres()
+    else:
+        check_user()
+        if not ensure_db():
+            sys.exit(1)
+
 
     font_id = QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "DEMO Broncks.ttf"))
     if font_id <0:

@@ -1,13 +1,36 @@
-from ctypes import alignment
 from pathlib import Path
-from PyQt6.QtWidgets import QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QLabel, QTableWidget
+import logging
+
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout,
+                             QHBoxLayout, QFormLayout, QLineEdit, QLabel, QTableWidget,
+                             QMessageBox)
 from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal
 from PyQt6.QtGui import QFont, QFontDatabase, QPixmap
-import logging
+from ctypes import alignment
+
 import bloolib
 import config
 
 logger = logging.getLogger(__name__)
+
+# Install and warning windows
+def warning_postgres():
+    app = QWidget()
+    msg_box = QMessageBox()
+    msg_box.setIcon(QMessageBox.Icon.Warning)
+    msg_box.setText("The PostgreSQL server is not running.")
+    msg_box.setInformativeText("Do you want to start it?")
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
+    msg_box.setDefaultButton(QMessageBox.StandardButton.Ok)
+    response = msg_box.exec()
+
+    if response == QMessageBox.StandardButton.Ok:
+        bloolib.start_postgres_server()
+    else:
+        app.quit()  # Close the application if the user cancels
+
+
+
 
 class PostgresTableModel(QAbstractTableModel):
     def __init__(self, data, headers):
@@ -62,6 +85,12 @@ class MainWindow(QMainWindow):
 
         title_bar.addStretch()
 
+        self.greeting = QLabel(f"Hello, {config.USERNAME}")
+        self.greeting.setFixedHeight(46)
+        self.greeting.setFont(QFont("Sans Serif", 14, QFont.Weight.Bold))
+        self.greeting.setContentsMargins(0, 8, 0, 0)
+        title_bar.addWidget(self.greeting)
+
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Search by item name")
         title_bar.addWidget(self.search_bar)
@@ -101,10 +130,11 @@ class MainWindow(QMainWindow):
 
         self.search_results.setRowCount(len(rows))
         for i, (name,) in enumerate(rows):
-            self.search_results.setItem(i, 0, QTableWidgetItem(name))
+            self.search_results.setItem(i, 0, QTableWidget(name))
 
     def on_pull_inventory(self):
         try:
+            self.table_view.setRowCount(0)
             rows, headers = bloolib.pull_inventory()
             model = PostgresTableModel(rows, headers)
             self.table_view.setModel(model)
@@ -141,8 +171,7 @@ class addItemsForm(QWidget):
         self.form_layout.addWidget(self.add_display)
 
         self.button_row()
-        for i in range(3):
-            self.add_row()
+        self.add_row()
 
     def add_row(self):
         hbox = QHBoxLayout()
@@ -152,8 +181,8 @@ class addItemsForm(QWidget):
             line.setPlaceholderText(placeholder)
             fields.append(line)
             hbox.addWidget(line)
-        self.rows.append(fields)
         self.form_layout.insertRow(self.form_layout.count() - 1, hbox)
+        self.rows.append(fields)
 
     # Not really sure if this is the best way to do this but its similar to form rows solution and keeps it contained idk.
     def button_row(self):
@@ -190,14 +219,21 @@ class addItemsForm(QWidget):
         return rows
 
     def on_submit_form(self):
-        rows = self.submit()
-
+        valid = True
+        for row in self.rows:
+            if not row[0].text() or not row[2].text() or not row[3].text():
+                QMessageBox.warning(self, "Validation Error", "All required fields must be filled.")
+                valid = False
+                break
+        if valid:
+            rows = self.submit()
         if bloolib.insert_form_data(rows):
-            logger.info("Data inserted successfully!")
-            self.closed.emit()
-            self.close()
+                logger.info("Data inserted successfully!")
+                self.closed.emit()
+                self.close()
         else:
-            print("Data insert failed")
+            QMessageBox.warning(self, "Database Error", "Failed to insert data.")
+            logger.error("Database error, Failed to insert data")
 
     def cancel(self):
         self.closed.emit()

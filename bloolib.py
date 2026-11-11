@@ -1,11 +1,30 @@
 from operator import truediv
+from gui import warning_postgres
 import psycopg
+import subprocess
 import logging
 import config
 import re
 
 
 logger = logging.getLogger(__name__)
+
+def postgres_check():
+    try:
+        connection = psycopg.connect("dbname=postgres user=postgres")
+        print("Connection to PostgreSQL server successful")
+        connection.close()
+        return True
+    except Exception as e:
+        return False
+
+def start_postgres_server():
+    try:
+        subprocess.run(['sudo', 'systemctl', 'start', 'postgresql'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print("PostgreSQL server started successfully.")
+    except Exception as e:
+        logger.error(f"Error occured: {e}")
+
 
 def check_user():
     if config.USERNAME == None:
@@ -102,7 +121,7 @@ def pull_inventory():
                 headers = [description[0] for description in cur.description]
                 return rows, headers
     except Exception as e:
-        logger.info(f"Unable to read inventory: {e}")
+        logger.error(f"Unable to read inventory: {e}")
         print(f"Error: {e}")
 
 def insert_sql_file(path_to_file):
