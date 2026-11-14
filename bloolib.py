@@ -153,12 +153,24 @@ def insert_form_data(rows):
         print(f"Error: {e}")
         return False
 
-def search(text):
+def search(text: str):
     dsn = f"dbname={config.DB_NAME} user=postgres"
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT item_name FROM inventory WHERE item_name ILIKE %s",
+            cur.execute("""
+                SELECT
+                item_name AS Item,
+                brand_name AS Brand,
+                amount || ' ' || units AS Amount,
+                Location,
+                expiration_date AS "Expiration Date"
+                FROM inventory
+                WHERE item_name ILIKE %s
+                ;
+                """,
                 (f"%{text}%",)
+
             )
-            return cur.fetchall()
+            rows = cur.fetchall()
+            headers = [description[0] for description in cur.description]
+            return rows, headers

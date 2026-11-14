@@ -3,7 +3,7 @@ import logging
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout,
                              QHBoxLayout, QFormLayout, QLineEdit, QLabel, QTableWidget,
-                             QMessageBox)
+                             QMessageBox, QTableWidgetItem)
 from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal
 from PyQt6.QtGui import QFont, QFontDatabase, QPixmap
 from ctypes import alignment
@@ -101,11 +101,6 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(title_bar)
 
-        self.search_results = QTableWidget()
-        self.search_results.setColumnCount(1)
-        self.search_results.setHorizontalHeaderLabels(["Item Name"])
-        layout.addWidget(self.search_results)
-
         self.pull_button = QPushButton("Pull Inventory")
         self.pull_button.clicked.connect(self.on_pull_inventory)
         layout.addWidget(self.pull_button)
@@ -122,20 +117,23 @@ class MainWindow(QMainWindow):
 
     def do_search(self):
         text = self.search_bar.text().strip()
-        self.search_results.setRowCount(0)
         if not text:
             return
-
-        rows = bloolib.search(text)
-
-        self.search_results.setRowCount(len(rows))
-        for i, (name,) in enumerate(rows):
-            self.search_results.setItem(i, 0, QTableWidget(name))
+        rows, headers = bloolib.search(text)
+        self.display_inventory(rows, headers)
 
     def on_pull_inventory(self):
         try:
-            self.table_view.setRowCount(0)
             rows, headers = bloolib.pull_inventory()
+            model = PostgresTableModel(rows, headers)
+            self.table_view.setModel(model)
+            logger.info("Inventory pulled successfully")
+        except Exception as e:
+            logger.error(f"Error pulling inventory: {e}")
+            print(f"Error: {e}")
+
+    def display_inventory(self, rows, headers):
+        try:
             model = PostgresTableModel(rows, headers)
             self.table_view.setModel(model)
             logger.info("Inventory pulled successfully")
