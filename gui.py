@@ -2,11 +2,12 @@ from pathlib import Path
 import logging
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout,
-                             QHBoxLayout, QFormLayout, QLineEdit, QLabel, QTableWidget,
-                             QMessageBox, QTableWidgetItem)
-from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal
-from PyQt6.QtGui import QFont, QFontDatabase, QPixmap
-from ctypes import alignment
+                             QHBoxLayout, QFormLayout, QLineEdit, QLabel, QApplication,
+                             QMessageBox, QFrame, QToolButton,
+                             QStackedWidget,)
+from PyQt6.QtCore import (Qt, QAbstractTableModel, QAbstractAnimation, QParallelAnimationGroup,
+                             QPropertyAnimation, QEvent, pyqtSignal)
+from PyQt6.QtGui import QFont, QFontDatabase, QPixmap, QPalette
 
 import bloolib
 import config
@@ -30,8 +31,150 @@ def warning_postgres():
         app.quit()
 
 
+# Collapsible menu
+class CollapsibleMenu(QFrame):
+    add_items = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("sideMenu")
+        self.setAutoFillBackground(True)
+        self.apply_theme_background()
+
+        self.stack = QStackedWidget()
+        self.stack.setFrameShape(QFrame.Shape.NoFrame)
+        self.table_view = QTableView()
+        self.table_view.setFrameShape(QFrame.Shape.NoFrame)
+        self.stack.addWidget(self.table_view)
+
+        self.setStyleSheet(
+            "QToolButton { border: none; font-size: 18px; }"
+            "QPushButton { background: transparent; border: none; text-align: left; "
+            "padding: 6px 12px; }"
+            "QPushButton:hover { color: #4a90d9; }"
+            ""
+        )
+
+        self.toggle_button = QToolButton()
+        self.toggle_button.setText("\u2630")
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setFixedSize(config.COLLAPSED_WIDTH, config.COLLAPSED_WIDTH)
+
+        self.menu = QVBoxLayout()
+        self.menu.setContentsMargins(0, 0, 0, 0)
+        self.menu.setSpacing(0)
+
+        self.menu.pull_button = QPushButton("Pull Inventory")
+        self.menu.pull_button.clicked.connect(self.on_pull_inventory)
+        self.menu.addWidget(self.menu.pull_button)
+
+        self.menu.add_items_button = QPushButton("Add Items")
+        self.menu.add_items_button.clicked.connect(self.on_add_items)
+        self.menu.addWidget(self.menu.add_items_button)
+
+        self.menu.addStretch()
+        # End of menu
+
+        self.menu_container = QWidget()
+        self.menu_container.setLayout(self.menu)
+        self.menu_container.hide()
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(0)
+        header.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        header.addWidget(self.toggle_button)
 
 
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addLayout(header)
+        root.addWidget(self.menu_container)
+
+        self.setMinimumWidth(config.COLLAPSED_WIDTH)
+        self.setMaximumWidth(config.COLLAPSED_WIDTH)
+
+        self.min_width_animation = QPropertyAnimation(self, b"minimumWidth")
+        self.max_width_animation = QPropertyAnimation(self, b"maximumWidth")
+        for animation in (self.min_width_animation, self.max_width_animation):
+            animation.setDuration(config.ANIMATION_DURATION)
+            animation.setStartValue(config.COLLAPSED_WIDTH)
+            animation.setEndValue(config.EXPANDED_WIDTH)
+
+        self.toggle_animation = QParallelAnimationGroup()
+        self.toggle_animation.addAnimation(self.min_width_animation)
+        self.toggle_animation.addAnimation(self.max_width_animation)
+        self.toggle_animation.finished.connect(self._on_animation_finished)
+
+        self.toggle_button.clicked.connect(self._on_toggle_clicked)
+
+    def apply_theme_background(self):
+        base = QApplication.palette().color(QPalette.ColorRole.Window)
+        target = base.darker(config.THEME_1_BACKGROUND_DARKEN_FACT0R)
+        if self.palette().color(QPalette.ColorRole.Window) != target:
+            palette = QPalette(QApplication.palette())
+            palette.setColor(QPalette.ColorRole.Window, target)
+            self.setPalette(palette)
+
+
+    def changeEvent(self, event):
+        if event.type() in (QEvent.Type.PaletteChange, QEvent.Type.StyleChange):
+            self.apply_theme_background()
+        super().changeEvent(event)
+
+    def _on_toggle_clicked(self, checked: bool):
+        if checked:
+            self.menu_container.show()
+        direction = (
+            QAbstractAnimation.Direction.Forward
+            if checked
+            else QAbstractAnimation.Direction.Backward
+        )
+        self.toggle_animation.setDirection(direction)
+        if self.toggle_animation.state() != QAbstractAnimation.State.Running:
+            self.toggle_animation.start()
+
+    def _on_animation_finished(self):
+        if not self.toggle_button.isChecked():
+            self.menu_container.hide()
+
+    def display_inventory(self, rows, headers):
+        try:
+            self.table_model = PostgresTableModel(rows, headers)
+            self.table_view.setModel(self.table_model)
+            self.stack.setCurrentWidget(self.table_view)
+            logger.info("Inventory pulled successfully")
+        except Exception as e:
+            logger.error(f"Error pulling inventory: {e}")
+            print(f"Error: {e}")
+
+    def on_pull_inventory(self):
+        rows, headers = bloolib.pull_inventory()
+        self.display_inventory(rows, headers)
+
+    def on_add_items(self):
+        self.add_items.emit()
+
+
+def build_menu_layout(parent_layout: QVBoxLayout):
+    row = QHBoxLayout()
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(0)
+
+    side_menu = CollapsibleMenu()
+
+    central = QVBoxLayout()
+    central.addWidget(side_menu.stack)
+
+
+    row.addWidget(side_menu)
+    row.addLayout(central, 1)
+    parent_layout.addLayout(row)
+
+    return side_menu, central
+
+# I am not sure how this works. but it works.
 class PostgresTableModel(QAbstractTableModel):
     def __init__(self, data, headers):
         super().__init__()
@@ -55,6 +198,7 @@ class PostgresTableModel(QAbstractTableModel):
         return None
 
 class MainWindow(QMainWindow):
+    search = pyqtSignal
     def __init__(self):
         super().__init__()
         self.setWindowTitle("KabNit: Self-Hosted Inventory Management")
@@ -67,11 +211,16 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         # Title bar Contents
         title_bar = QHBoxLayout()
+        darker = QApplication.palette().color(QPalette.ColorRole.Window).darker(config.THEME_2_BACKGROUND_DARKEN_FACT0R)
+
 
         self.logo = QLabel()
+        self.logo.setContentsMargins(-4, 0, 0, 0)
         pixmap = QPixmap(str(config.BASE_DIR / "static" / "logo.png"))
         self.logo.setPixmap(pixmap.scaledToHeight(32, Qt.TransformationMode.SmoothTransformation))
         title_bar.addWidget(self.logo)
@@ -93,25 +242,25 @@ class MainWindow(QMainWindow):
 
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Search by item name")
+        self.search_bar.returnPressed.connect(self.do_search)
         title_bar.addWidget(self.search_bar)
 
         self.search_button = QPushButton("Search")
         self.search_button.clicked.connect(self.do_search)
         title_bar.addWidget(self.search_button)
 
-        layout.addLayout(title_bar)
+        title_widget = QWidget()
+        title_widget.setAutoFillBackground(True)
+        palette = title_widget.palette()
+        palette.setColor(QPalette.ColorRole.Window,
+                         QApplication.palette().color(QPalette.ColorRole.Window).darker(config.THEME_2_BACKGROUND_DARKEN_FACT0R))
+        title_widget.setPalette(palette)
+        title_widget.setLayout(title_bar)
+        layout.addWidget(title_widget)
 
-        self.pull_button = QPushButton("Pull Inventory")
-        self.pull_button.clicked.connect(self.on_pull_inventory)
-        layout.addWidget(self.pull_button)
-
-        self.table_view = QTableView()
-        layout.addWidget(self.table_view)
-
-        self.add_items = QPushButton("Add Items")
-        self.add_items.clicked.connect(self.open_add_items_form)
-        self.add_form = None
-        layout.addWidget(self.add_items)
+        # Split menu window
+        self.side_menu, self.central = build_menu_layout(layout)
+        self.side_menu.add_items.connect(self.open_add_items_form)
 
         central_widget.setLayout(layout)
 
@@ -120,26 +269,11 @@ class MainWindow(QMainWindow):
         if not text:
             return
         rows, headers = bloolib.search(text)
-        self.display_inventory(rows, headers)
+        self.side_menu.display_inventory(rows, headers)
 
     def on_pull_inventory(self):
-        try:
-            rows, headers = bloolib.pull_inventory()
-            model = PostgresTableModel(rows, headers)
-            self.table_view.setModel(model)
-            logger.info("Inventory pulled successfully")
-        except Exception as e:
-            logger.error(f"Error pulling inventory: {e}")
-            print(f"Error: {e}")
-
-    def display_inventory(self, rows, headers):
-        try:
-            model = PostgresTableModel(rows, headers)
-            self.table_view.setModel(model)
-            logger.info("Inventory pulled successfully")
-        except Exception as e:
-            logger.error(f"Error pulling inventory: {e}")
-            print(f"Error: {e}")
+        rows, headers = bloolib.pull_inventory()
+        self.display_inventory(rows, headers)
 
     def open_add_items_form(self):
         self.add_form = addItemsForm()

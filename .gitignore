@@ -14,4 +14,4 @@ wheels/
 *.log
 
 # Tools
-test.py
+quicktest.py
