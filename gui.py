@@ -52,8 +52,9 @@ class CollapsibleMenu(QFrame):
             "QPushButton { background: transparent; border: none; text-align: left; "
             "padding: 6px 12px; }"
             "QPushButton:hover { color: #4a90d9; }"
-            ""
+            'QLabel[role="h2"] { font-size: 16px; font-weight: bold; padding: 8px 12px 4px 12px; }'
         )
+
 
         self.toggle_button = QToolButton()
         self.toggle_button.setText("\u2630")
@@ -64,6 +65,11 @@ class CollapsibleMenu(QFrame):
         self.menu.setContentsMargins(0, 0, 0, 0)
         self.menu.setSpacing(0)
 
+        # Start of menu
+        self.menu.actions_header = QLabel("Actions")
+        self.menu.actions_header.setProperty("role", "h2")
+        self.menu.addWidget(self.menu.actions_header)
+
         self.menu.pull_button = QPushButton("Pull Inventory")
         self.menu.pull_button.clicked.connect(self.on_pull_inventory)
         self.menu.addWidget(self.menu.pull_button)
@@ -71,6 +77,19 @@ class CollapsibleMenu(QFrame):
         self.menu.add_items_button = QPushButton("Add Items")
         self.menu.add_items_button.clicked.connect(self.on_add_items)
         self.menu.addWidget(self.menu.add_items_button)
+
+        self.menu.locations_header = QLabel("Locations")
+        self.menu.locations_header.setProperty("role", "h2")
+        self.menu.addWidget(self.menu.locations_header)
+
+        self.location_buttons = {}
+
+        locations = bloolib.load_locations()
+        for location in locations:
+            button = QPushButton(location)
+            button.clicked.connect(lambda check=False, n=location: self.load_location_inventory(n))
+            self.menu.addWidget(button)
+            self.location_buttons[location] = button
 
         self.menu.addStretch()
         # End of menu
@@ -155,6 +174,13 @@ class CollapsibleMenu(QFrame):
 
     def on_add_items(self):
         self.add_items.emit()
+
+    def load_location_inventory(self, location):
+        rows, headers = bloolib.pull_location(location)
+        self.display_inventory(rows, headers)
+
+
+
 
 
 def build_menu_layout(parent_layout: QVBoxLayout):
@@ -252,8 +278,7 @@ class MainWindow(QMainWindow):
         title_widget = QWidget()
         title_widget.setAutoFillBackground(True)
         palette = title_widget.palette()
-        palette.setColor(QPalette.ColorRole.Window,
-                         QApplication.palette().color(QPalette.ColorRole.Window).darker(config.THEME_2_BACKGROUND_DARKEN_FACT0R))
+        palette.setColor(QPalette.ColorRole.Window, darker)
         title_widget.setPalette(palette)
         title_widget.setLayout(title_bar)
         layout.addWidget(title_widget)

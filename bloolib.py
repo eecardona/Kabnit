@@ -8,6 +8,7 @@ import re
 
 
 logger = logging.getLogger(__name__)
+dsn = f"dbname={config.DB_NAME} user=postgres"
 
 def postgres_check():
     try:
@@ -57,7 +58,7 @@ def config_update(setting, update):
 
 def create_table():
     try:
-        with psycopg.connect(f"dbname={config.DB_NAME} user=postgres") as conn:
+        with psycopg.connect(dsn) as conn:
             conn.autocommit = True
             with conn.cursor() as cur:
                 cur.execute("""
@@ -102,7 +103,7 @@ def set_user():
 
 def pull_inventory():
     try:
-        with psycopg.connect(f"dbname={config.DB_NAME} user=postgres") as conn:
+        with psycopg.connect(dsn) as conn:
             conn.autocommit = True
             with conn.cursor() as cur:
                 cur.execute("""
@@ -127,7 +128,7 @@ def pull_inventory():
 def insert_sql_file(path_to_file):
     try:
         logger.info("Attempting to connect to inventory database")
-        conn = psycopg.connect(f"dbname={config.DB_NAME} user=postgres")
+        conn = psycopg.connect(dsn)
         logger.info("Connected to database")
         cur = conn.cursor()
         cur.execute(open(file=path_to_file).read())
@@ -139,7 +140,7 @@ def insert_sql_file(path_to_file):
 
 def insert_form_data(rows):
     try:
-        with psycopg.connect(f"dbname={config.DB_NAME} user=postgres") as conn:
+        with psycopg.connect(dsn) as conn:
             with conn.cursor() as cur:
                 cur.executemany(
                     "INSERT INTO inventory (item_name, brand_name, amount, units, location, expiration_date, barcode, price_paid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
@@ -154,7 +155,6 @@ def insert_form_data(rows):
         return False
 
 def search(text: str):
-    dsn = f"dbname={config.DB_NAME} user=postgres"
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -171,6 +171,36 @@ def search(text: str):
                 (f"%{text}%",)
 
             )
+            rows = cur.fetchall()
+            headers = [description[0] for description in cur.description]
+            return rows, headers
+
+def load_locations():
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT location
+                FROM inventory
+                ORDER BY location
+               ;
+            """)
+            rows = cur.fetchall()
+            list = [row[0] for row in rows]
+            return list
+
+def pull_location(location):
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT
+                    item_name AS Item,
+                    brand_name AS Brand,
+                    amount || '' || units AS Amount,
+                    expiration_date AS "Expiration Date"
+                    FROM inventory
+                    WHERE location ILIKE %s
+                    ;
+                """, (location,))
             rows = cur.fetchall()
             headers = [description[0] for description in cur.description]
             return rows, headers
