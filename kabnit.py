@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 app = QApplication(sys.argv)
 
+icon_path = os.path.join
 #Style
 btn_color = app.palette().color(QPalette.ColorRole.Button)
 

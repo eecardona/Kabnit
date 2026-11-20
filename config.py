@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # User Details
-USERNAME = "EEEEEEEE"
+USERNAME = "$User"
 
 # Database details
 DB_NAME = "kabnit"

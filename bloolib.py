@@ -1,18 +1,36 @@
+#Third Party imports
+from dotenv import load_dotenv, set_key
+import psycopg
+
 from operator import truediv
 from gui import warning_postgres
-import psycopg
 import subprocess
 import logging
 import config
 import re
+import os
+
 
 
 logger = logging.getLogger(__name__)
-dsn = f"dbname={config.DB_NAME} user=postgres"
+host = os.getenv("KABNIT_HOST")
+user = os.getenv("KABNIT_DB_USER")
+password = os.getenv("KABNIT_DB_PASSWORD")
+port = os.getenv("KABNIT_PORT")
+dsn = ("host=%s dbname=%s password=%s port=%s", host, user, password, port)
+
+def validate_credentials(host, username, password, port="5432"):
+    try:
+        connection = psycopg.connect("host=%s dbname=%s password=%s port=%s", host, username, password, port)
+        logger.info("Connection to PostgreSQL server successful")
+        connection.close()
+        return True
+    except Exception as e:
+        return False
 
 def postgres_check():
     try:
-        connection = psycopg.connect("dbname=postgres user=postgres")
+        connection = psycopg.connect(dsn)
         logger.info("Connection to PostgreSQL server successful")
         connection.close()
         return True
@@ -31,29 +49,29 @@ def check_user():
     if config.USERNAME == None:
         set_user()
 
-def create_db():
-    try:
-        with psycopg.connect("dbname=postgres user=postgres") as admin_conn:
-            admin_conn.autocommit = True
-            with admin_conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (f"{config.DB_NAME}",))
-                if cur.fetchone() is None:
-                    admin_conn.autocommit = True
-                    with admin_conn.cursor() as cur:
-                        cur.execute(f'CREATE DATABASE "{config.DB_NAME}"')
-                logger.info(f'Database "{config.DB_NAME}" created on postgres server')
-    except Exception as e:
-        logger.info(f"Failure creating initial database: {e}")
+# def create_db():
+#     try:
+#         with psycopg.connect("dbname=postgres user=postgres") as admin_conn:
+#             admin_conn.autocommit = True
+#             with admin_conn.cursor() as cur:
+#                 cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (f"{config.DB_NAME}",))
+#                 if cur.fetchone() is None:
+#                     admin_conn.autocommit = True
+#                     with admin_conn.cursor() as cur:
+#                         cur.execute(f'CREATE DATABASE "{config.DB_NAME}"')
+#                 logger.info(f'Database "{config.DB_NAME}" created on postgres server')
+#     except Exception as e:
+#         logger.info(f"Failure creating initial database: {e}")
 
 # Updates setting permanantly in config.py.
 # Ensure you change value locally with config.{setting} = {update}
 def config_update(setting, update):
-    with open(file="config.py") as f:
+    with open(file=f"{config.BASE_DIR}/config.py") as f:
         content = f.read()
 
     content = re.sub(rf'{setting}\s*=.*', f'{setting} = "{update}"', content)
 
-    with open(file="config.py", mode="w") as f:
+    with open(file=f"{config.BASE_DIR}/config.py", mode="w") as f:
         f.write(content)
 
 def create_table():
@@ -95,7 +113,7 @@ def ensure_db():
 def set_user():
     print("Welcome to KabNit! Please enter a username to identify you:")
     username = input()
-    config_update("USERNAME",f"{username}")
+    config_update("USERNAME", f"{username}")
     config.USERNAME = username
     logger.info(f"User {username} saved as owner")
     print(f"Thanks {username}")
@@ -195,7 +213,7 @@ def pull_location(location):
                 SELECT
                     item_name AS Item,
                     brand_name AS Brand,
-                    amount || '' || units AS Amount,
+                    amount || ' ' || units AS Amount,
                     expiration_date AS "Expiration Date"
                     FROM inventory
                     WHERE location ILIKE %s
@@ -204,3 +222,10 @@ def pull_location(location):
             rows = cur.fetchall()
             headers = [description[0] for description in cur.description]
             return rows, headers
+
+def save_credentials(self):
+    host, port, username, password = self.credentials()
+    set_key(".env", "KABNIT_HOST", str(host))
+    set_key(".env", "KABNIT_PORT", str(port))
+    set_key(".env", "KABNIT_DB_USER", str(username))
+    set_key(".env", "KABNIT_DB_PASSWORD", str(password))

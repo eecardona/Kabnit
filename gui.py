@@ -1,25 +1,96 @@
+
 from pathlib import Path
 import logging
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout,
                              QHBoxLayout, QFormLayout, QLineEdit, QLabel, QApplication,
-                             QMessageBox, QFrame, QToolButton,
+                             QMessageBox, QFrame, QToolButton, QDialog, QDialogButtonBox,
                              QStackedWidget,)
 from PyQt6.QtCore import (Qt, QAbstractTableModel, QAbstractAnimation, QParallelAnimationGroup,
                              QPropertyAnimation, QEvent, pyqtSignal)
-from PyQt6.QtGui import QFont, QFontDatabase, QPixmap, QPalette
+from PyQt6.QtGui import QFont, QFontDatabase, QPixmap, QPalette, QIcon
 
 import bloolib
 import config
 
 logger = logging.getLogger(__name__)
 
+
 # Install and warning windows
+class LoginDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Postgres Log in")
+        self.message = QLabel("Postgres Server Login")
+        self.subtitle = QLabel("Please enter the details for your postgres server")
+
+        host_label = QLabel("Username:")
+        host_label.setTooltip("This will be your server ip")
+
+        self.host_input = QLineEdit()
+        self.host_input.setPlaceholderText("Host")
+
+        self.port_input = QLineEdit()
+        self.port_input.setPlaceholderText("Default:5432")
+
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Username")
+
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText("Password")
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+
+        form = QFormLayout()
+        form.addRow(self.message)
+        form.addRow(self.subtitle)
+        form.addRow(host_label, self.host_input)
+        form.addRow("Username:", self.username_input)
+        form.addRow("Password:", self.password_input)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Log in")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.cancel)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+    def credentials(self):
+        return self.host_input.text(), self.username_input.text, self.password_input.text(), self.port_input.text()
+
+    def accept(self):
+        host, username, password, port = self.credentials()
+        if bloolib.validate_credentials(host, username, password, port):
+            bloolib.save_credentials(self)
+            return True
+        else:
+            print("Invalid Credentials")
+            return False
+
+def login_check():
+    app = QWidget()
+    login = LoginDialog()
+    login.setWindowIcon(QIcon(str(config.BASE_DIR / "static" / "icon.png")))
+
+
+
+
+
+
+
+
+
+
+
+
 def warning_postgres():
     app = QWidget()
     msg_box = QMessageBox()
     msg_box.setIcon(QMessageBox.Icon.Warning)
-    msg_box.setText("The PostgreSQL server is not running.")
+    msg_box.setText("The PostgresSQL server is not running.")
     msg_box.setInformativeText("Do you want to start it?")
     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
     msg_box.setDefaultButton(QMessageBox.StandardButton.Ok)
@@ -54,7 +125,6 @@ class CollapsibleMenu(QFrame):
             "QPushButton:hover { color: #4a90d9; }"
             'QLabel[role="h2"] { font-size: 16px; font-weight: bold; padding: 8px 12px 4px 12px; }'
         )
-
 
         self.toggle_button = QToolButton()
         self.toggle_button.setText("\u2630")
@@ -228,6 +298,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("KabNit: Self-Hosted Inventory Management")
+        self.setWindowIcon(QIcon(str(config.BASE_DIR / "static" / "icon.png")))
         self.setGeometry(100, 100, 800, 600)
 
         font_id = QFontDatabase.applicationFontFamilies(
