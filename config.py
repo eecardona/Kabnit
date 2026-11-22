@@ -4,7 +4,7 @@ from pathlib import Path
 USERNAME = "$User"
 
 # Database details
-DB_NAME = "kabnit"
+INITIAL_SETUP = True
 
 BASE_DIR = Path(__file__).resolve().parent
 

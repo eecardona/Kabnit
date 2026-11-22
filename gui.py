@@ -18,72 +18,65 @@ logger = logging.getLogger(__name__)
 
 # Install and warning windows
 class LoginDialog(QDialog):
+    login_successful = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
+
         self.setWindowTitle("Postgres Log in")
         self.message = QLabel("Postgres Server Login")
         self.subtitle = QLabel("Please enter the details for your postgres server")
 
-        host_label = QLabel("Username:")
-        host_label.setTooltip("This will be your server ip")
+        host_label = QLabel("Host:")
+        host_label.setToolTip("This will be your server ip")
 
+        # Widget Creation
         self.host_input = QLineEdit()
-        self.host_input.setPlaceholderText("Host")
-
+        self.db_input = QLineEdit()
+        self.username_input = QLineEdit()
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.port_input = QLineEdit()
         self.port_input.setPlaceholderText("Default:5432")
 
-        self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Username")
-
-        self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Password")
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-
+        # Form Organization
         form = QFormLayout()
         form.addRow(self.message)
         form.addRow(self.subtitle)
         form.addRow(host_label, self.host_input)
+        form.addRow("Database Name:", self.db_input)
         form.addRow("Username:", self.username_input)
         form.addRow("Password:", self.password_input)
+        form.addRow("Port:", self.port_input)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Log in")
         buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.cancel)
+        buttons.rejected.connect(self.reject)
 
+        # Layout Organization
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(buttons)
 
     def credentials(self):
-        return self.host_input.text(), self.username_input.text, self.password_input.text(), self.port_input.text()
+        return self.host_input.text(), self.db_input.text(), self.username_input.text(), self.password_input.text(), self.port_input.text()
 
     def accept(self):
-        host, username, password, port = self.credentials()
-        if bloolib.validate_credentials(host, username, password, port):
+        host, db, username, password, port = self.credentials()
+        if bloolib.validate_credentials(host, db, username, password, port):
             bloolib.save_credentials(self)
+            bloolib.config_update(config.INITIAL_SETUP, True)
+            self.on_login_success()
             return True
         else:
             print("Invalid Credentials")
             return False
 
-def login_check():
-    app = QWidget()
-    login = LoginDialog()
-    login.setWindowIcon(QIcon(str(config.BASE_DIR / "static" / "icon.png")))
-
-
-
-
-
-
-
-
-
-
+    def on_login_success(self):
+        self.login_successful.emit()
 
 
 def warning_postgres():
@@ -250,9 +243,6 @@ class CollapsibleMenu(QFrame):
         self.display_inventory(rows, headers)
 
 
-
-
-
 def build_menu_layout(parent_layout: QVBoxLayout):
     row = QHBoxLayout()
     row.setContentsMargins(0, 0, 0, 0)
@@ -379,8 +369,6 @@ class MainWindow(QMainWindow):
     def on_form_closed(self):
         self.add_form = None
         self.show()
-
-
 
 
 class addItemsForm(QWidget):

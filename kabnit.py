@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFontDatabase, QPalette
-from bloolib import check_user, ensure_db, postgres_check
+from bloolib import check_user, postgres_check
 import logging
 import config
 import gui
@@ -13,6 +13,7 @@ logging.basicConfig(
     filename='kabnit.log'
 )
 logger = logging.getLogger(__name__)
+os.environ["QT_QPA_PLATFORMTHEME"] = "kde"  # Plan to change this to a sys call to identify user session and set theme for them.
 
 app = QApplication(sys.argv)
 
@@ -33,26 +34,34 @@ app.setStyleSheet(f"""
 """)
 
 def main():
-    os.environ["QT_QPA_PLATFORMTHEME"] = "kde"  # Plan to change this to a sys call to identify user session and set theme for them.
-
-    if not postgres_check():
-        print("Check returned False")
-        gui.warning_postgres()
-    else:
-        check_user()
-        if not ensure_db():
-            sys.exit(1)
-
-
     font_id = QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "DEMO Broncks.ttf"))
     if font_id <0:
         logger.error("ERROR: Failed to load font")
     else:
         font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
 
-    window = gui.MainWindow()
-    window.show()
+    if config.INITIAL_SETUP == False:
+        login_window = gui.LoginDialog()
+        main_window = None
+
+        def open_main_window():
+            nonlocal main_window
+            main_window = gui.MainWindow()
+            main_window.show()
+            login_window.close()
+
+        login_window.login_successful.connect(open_main_window)
+        login_window.show()
+
+    else:
+        main_window = gui.MainWindow()
+        main_window.show()
+
     app.exec()
+
+
+
+
 
 if __name__ == "__main__":
     main()
