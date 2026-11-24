@@ -5,7 +5,7 @@ import logging
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QPushButton, QTableView, QVBoxLayout,
                              QHBoxLayout, QFormLayout, QLineEdit, QLabel, QApplication,
                              QMessageBox, QFrame, QToolButton, QDialog, QDialogButtonBox,
-                             QStackedWidget,)
+                             QStackedWidget, QFileDialog, QSizePolicy, QCheckBox)
 from PyQt6.QtCore import (Qt, QAbstractTableModel, QAbstractAnimation, QParallelAnimationGroup,
                              QPropertyAnimation, QEvent, pyqtSignal)
 from PyQt6.QtGui import QFont, QFontDatabase, QPixmap, QPalette, QIcon
@@ -78,6 +78,15 @@ class LoginDialog(QDialog):
     def on_login_success(self):
         self.login_successful.emit()
 
+class UploadWindow(QFileDialog):
+    def __init__(self):
+        self.setWindowTitle("Upload sql file")
+        self.setGeometry(100, 100, 400, 300)
+        self.button = QPushButton("Open File", self)
+
+        self.button.clicked.connect(self.openFileDialog)
+
+
 
 def warning_postgres():
     app = QWidget()
@@ -98,6 +107,7 @@ def warning_postgres():
 # Collapsible menu
 class CollapsibleMenu(QFrame):
     add_items = pyqtSignal()
+    file_upload = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -107,9 +117,17 @@ class CollapsibleMenu(QFrame):
 
         self.stack = QStackedWidget()
         self.stack.setFrameShape(QFrame.Shape.NoFrame)
+        self.stack.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Expanding)
+
         self.table_view = QTableView()
         self.table_view.setFrameShape(QFrame.Shape.NoFrame)
+        self.table_view.setSizeAdjustPolicy(QTableView.SizeAdjustPolicy.AdjustToContents)
+        self.table_view.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Expanding)
+        table_bg = QApplication.palette().color(QPalette.ColorRole.Window).lighter(config.THEME_3_BACKGROUND_LIGHTEN_FACTOR).name()
         self.stack.addWidget(self.table_view)
+        self.table_view.setStyleSheet(
+            f"QTableView::item {{ background-color: {table_bg}; }}"
+        )
 
         self.setStyleSheet(
             "QToolButton { border: none; font-size: 18px; }"
@@ -140,6 +158,11 @@ class CollapsibleMenu(QFrame):
         self.menu.add_items_button = QPushButton("Add Items")
         self.menu.add_items_button.clicked.connect(self.on_add_items)
         self.menu.addWidget(self.menu.add_items_button)
+
+        self.menu.sql_file_insert = QPushButton("Import")
+        self.menu.sql_file_insert.setToolTip("Import .sql files for mass data insert")
+        self.menu.sql_file_insert.clicked.connect(lambda: self.file_upload.emit())
+        self.menu.addWidget(self.menu.sql_file_insert)
 
         self.menu.locations_header = QLabel("Locations")
         self.menu.locations_header.setProperty("role", "h2")
@@ -221,10 +244,13 @@ class CollapsibleMenu(QFrame):
         if not self.toggle_button.isChecked():
             self.menu_container.hide()
 
-    def display_inventory(self, rows, headers):
+    def display_inventory(self, rows, headers, title="Inventory"):
         try:
+            self.view_title.setText(title)
             self.table_model = PostgresTableModel(rows, headers)
             self.table_view.setModel(self.table_model)
+            self.table_view.resizeColumnsToContents()
+            self.table_view.resizeRowsToContents()
             self.stack.setCurrentWidget(self.table_view)
             logger.info("Inventory pulled successfully")
         except Exception as e:
@@ -233,14 +259,14 @@ class CollapsibleMenu(QFrame):
 
     def on_pull_inventory(self):
         rows, headers = bloolib.pull_inventory()
-        self.display_inventory(rows, headers)
+        self.display_inventory(rows, headers,"All Inventory")
 
     def on_add_items(self):
         self.add_items.emit()
 
     def load_location_inventory(self, location):
         rows, headers = bloolib.pull_location(location)
-        self.display_inventory(rows, headers)
+        self.display_inventory(rows, headers, f"{location} Inventory")
 
 
 def build_menu_layout(parent_layout: QVBoxLayout):
@@ -249,9 +275,14 @@ def build_menu_layout(parent_layout: QVBoxLayout):
     row.setSpacing(0)
 
     side_menu = CollapsibleMenu()
+    side_menu.view_title = QLabel("Inventory")
+    side_menu.view_title.setContentsMargins(0, 8, 0, 0)
+    side_menu.view_title.setFont(QFont("Smoov", 18))#, QFont.Weight.Bold))
 
     central = QVBoxLayout()
-    central.addWidget(side_menu.stack)
+    central.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
+    central.addWidget(side_menu.view_title, alignment= Qt.AlignmentFlag.AlignCenter)
+    central.addWidget(side_menu.stack, alignment= Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
 
 
     row.addWidget(side_menu)
@@ -292,7 +323,7 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 800, 600)
 
         font_id = QFontDatabase.applicationFontFamilies(
-            QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "DEMO Broncks.ttf"))
+            QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "Smoov.ttf"))
         )
 
         central_widget = QWidget()
@@ -307,7 +338,7 @@ class MainWindow(QMainWindow):
 
 
         self.logo = QLabel()
-        self.logo.setContentsMargins(-4, 0, 0, 0)
+        self.logo.setContentsMargins(0, 0, 0, 0)
         pixmap = QPixmap(str(config.BASE_DIR / "static" / "logo.png"))
         self.logo.setPixmap(pixmap.scaledToHeight(32, Qt.TransformationMode.SmoothTransformation))
         title_bar.addWidget(self.logo)
@@ -315,7 +346,7 @@ class MainWindow(QMainWindow):
         self.app_name = QLabel("KabNit")
         self.app_name.setFixedHeight(46)
         self.app_name.setContentsMargins(0, 8, 0, 0)
-        self.app_name.setFont(QFont("Broncks DEMO", 28, QFont.Weight.Bold))
+        self.app_name.setFont(QFont("Smoov", 28, QFont.Weight.Bold))
         self.app_name.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft)
         title_bar.addWidget(self.app_name)
 
@@ -337,6 +368,7 @@ class MainWindow(QMainWindow):
         title_bar.addWidget(self.search_button)
 
         title_widget = QWidget()
+        title_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         title_widget.setAutoFillBackground(True)
         palette = title_widget.palette()
         palette.setColor(QPalette.ColorRole.Window, darker)
@@ -347,6 +379,7 @@ class MainWindow(QMainWindow):
         # Split menu window
         self.side_menu, self.central = build_menu_layout(layout)
         self.side_menu.add_items.connect(self.open_add_items_form)
+        self.side_menu.file_upload.connect(self.open_file)
 
         central_widget.setLayout(layout)
 
@@ -354,8 +387,9 @@ class MainWindow(QMainWindow):
         text = self.search_bar.text().strip()
         if not text:
             return
+
         rows, headers = bloolib.search(text)
-        self.side_menu.display_inventory(rows, headers)
+        self.side_menu.display_inventory(rows, headers, f'Search Results: "{text}"')
 
     def on_pull_inventory(self):
         rows, headers = bloolib.pull_inventory()
@@ -369,6 +403,24 @@ class MainWindow(QMainWindow):
     def on_form_closed(self):
         self.add_form = None
         self.show()
+
+    def open_file(self):
+        path_to_file, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select SQL file",
+            "",
+            "SQL files (*.sql)",
+        )
+        if not path_to_file:
+            return
+
+        try:
+            bloolib.insert_sql_file(path_to_file)
+        except Exception:
+            logger.exception("Insert failed")
+            QMessageBox.critical(self, "Import failed", "The SQL file could not be imported.")
+        else:
+            QMessageBox.information(self, "Import complete", "The SQL file was imported.")
 
 
 class addItemsForm(QWidget):
@@ -391,30 +443,46 @@ class addItemsForm(QWidget):
         self.add_row()
 
     def add_row(self):
-        hbox = QHBoxLayout()
+        row_widget = QWidget()
+        hbox = QHBoxLayout(row_widget)
+        hbox.setContentsMargins(0, 0, 0, 0)
+
+        checkbox = QCheckBox()
+        hbox.addWidget(checkbox)
+
         fields = []
         for placeholder in ["Item name", "Brand name", "Amount", "Units", "Location", "Expiration date", "Price paid"]:
             line = QLineEdit()
             line.setPlaceholderText(placeholder)
+            lighten = QApplication.palette().color(QPalette.ColorRole.Window).lighter(config.THEME_3_BACKGROUND_LIGHTEN_FACTOR).name()
+            line.setStyleSheet(f"background-color: {lighten}")
             fields.append(line)
             hbox.addWidget(line)
-        self.form_layout.insertRow(self.form_layout.count() - 1, hbox)
-        self.rows.append(fields)
-        self.row_layouts.append(hbox)
+
+        row = {
+            "checkbox": checkbox,
+            "fields": fields,
+            "widget": row_widget,
+        }
+
+        self.form_layout.insertRow(self.form_layout.count() - 1, row_widget)
+        self.rows.append(row)
 
     def remove_row(self):
-        if not self.rows:
-            return
+        selected_rows = [
+            row for row in self.rows if row["checkbox"].isChecked()
+        ]
 
-        fields = self.rows.pop()
-        hbox = self.row_layouts.pop()
+        for row in selected_rows:
+            self.form_layout.removeRow(row["widget"])
+            self.rows.remove(row)
 
-        for widget in fields:
-            hbox.removeWidget(widget)
-            widget.hide()
-            widget.deleteLater()
+        self.form_layout.activate()
+        self.adjustSize()
 
-        self.form_layout.removeRow(hbox)
+        # parent = self.parentWidget()
+        # if parent is not None:
+        #     parent.adjustSize()
 
     # Not really sure if this is the best way to do this but its similar to form rows solution and keeps it contained idk.
     def button_row(self):

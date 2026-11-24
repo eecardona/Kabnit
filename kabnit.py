@@ -34,7 +34,7 @@ app.setStyleSheet(f"""
 """)
 
 def main():
-    font_id = QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "DEMO Broncks.ttf"))
+    font_id = QFontDatabase.addApplicationFont(str(config.BASE_DIR / "static" / "fonts" / "Smoov.ttf"))
     if font_id <0:
         logger.error("ERROR: Failed to load font")
     else:

@@ -1,10 +1,11 @@
 #Third Party imports
 from dotenv import load_dotenv, set_key
+from pathlib import Path
 import psycopg
 
 from operator import truediv
 from gui import warning_postgres
-import subprocess
+#import subprocess
 import logging
 import config
 import re
@@ -51,12 +52,14 @@ def postgres_check():
         logger.exception("Connection failed")
         return False
 
-def start_postgres_server():
-    try:
-        subprocess.run(['sudo', 'systemctl', 'start', 'postgresql'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        logger.info("PostgreSQL server started successfully.")
-    except Exception:
-        logger.exception("Server failed start")
+# Code for running local postgres instance on the same machine.
+# could be repurposed for an option to add later?
+# def start_postgres_server():
+#     try:
+#         subprocess.run(['sudo', 'systemctl', 'start', 'postgresql'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#         logger.info("PostgreSQL server started successfully.")
+#     except Exception:
+#         logger.exception("Server failed start")
 
 
 def check_user():
@@ -130,17 +133,14 @@ def pull_inventory():
         print(f"Error: {e}")
 
 def insert_sql_file(path_to_file):
-    try:
-        logger.info("Attempting to connect to inventory database")
-        conn = psycopg.connect(**get_dsn())
-        logger.info("Connected to database")
-        cur = conn.cursor()
-        cur.execute(open(file=path_to_file).read())
-        conn.commit()
-        logger.info('File inserted into table "inventory"')
-    except Exception as e:
-        logger.error(f"Insert failed: {e}")
-        print(f"Error: {e}")
+    sql = Path(path_to_file).read_text(encoding="utf-8")
+
+    logger.info("Attempting to connect to inventory database")
+    with psycopg.connect(**get_dsn()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+
+    logger.info('SQL file executed successfully')
 
 def insert_form_data(rows):
     try:
