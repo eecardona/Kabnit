@@ -9,7 +9,7 @@ wheels/
 .env
 
 # Virtual environments
-.venv
+.venv/
 
 # File Types
 *.log

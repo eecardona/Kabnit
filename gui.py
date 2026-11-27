@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QPushButton, QTableView, QVBo
 from PyQt6.QtCore import (Qt, QAbstractTableModel, QAbstractAnimation, QParallelAnimationGroup,
                              QPropertyAnimation, QEvent, pyqtSignal)
 from PyQt6.QtGui import QFont, QFontDatabase, QPixmap, QPalette, QIcon
-
+import os
 import bloolib
 import config
 
@@ -68,7 +68,6 @@ class LoginDialog(QDialog):
         host, db, username, password, port = self.credentials()
         if bloolib.validate_credentials(host, db, username, password, port):
             bloolib.save_credentials(self)
-            bloolib.config_update(config.INITIAL_SETUP, True)
             self.on_login_success()
             return True
         else:
@@ -96,12 +95,12 @@ def warning_postgres():
     msg_box.setInformativeText("Do you want to start it?")
     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
     msg_box.setDefaultButton(QMessageBox.StandardButton.Ok)
-    response = msg_box.exec()
+    # response = msg_box.exec()
 
-    if response == QMessageBox.StandardButton.Ok:
-        bloolib.start_postgres_server()
-    else:
-        app.quit()
+    # if response == QMessageBox.StandardButton.Ok:
+    #     bloolib.start_postgres_server()
+    # else:
+    #     app.quit()
 
 
 # Collapsible menu
@@ -352,7 +351,8 @@ class MainWindow(QMainWindow):
 
         title_bar.addStretch()
 
-        self.greeting = QLabel(f"Hello, {config.USERNAME}")
+        username = os.getenv("USERNAME")
+        self.greeting = QLabel(f"Hello, {username}")
         self.greeting.setFixedHeight(46)
         self.greeting.setFont(QFont("Sans Serif", 14, QFont.Weight.Bold))
         self.greeting.setContentsMargins(0, 8, 0, 0)

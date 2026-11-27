@@ -1,11 +1,5 @@
 from pathlib import Path
 
-# User Details
-USERNAME = "$User"
-
-# Database details
-INITIAL_SETUP = True
-
 BASE_DIR = Path(__file__).resolve().parent
 
 # Collapsible menu config

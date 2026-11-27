@@ -5,7 +5,6 @@ import psycopg
 
 from operator import truediv
 from gui import warning_postgres
-#import subprocess
 import logging
 import config
 import re
@@ -61,11 +60,6 @@ def postgres_check():
 #     except Exception:
 #         logger.exception("Server failed start")
 
-
-def check_user():
-    if config.USERNAME == None:
-        set_user()
-
 def config_update(setting, update):
     with open(file=f"{config.BASE_DIR}/config.py") as f:
         content = f.read()
@@ -102,10 +96,9 @@ def create_table():
 def set_user():
     print("Welcome to KabNit! Please enter a username to identify you:")
     username = input()
-    config_update("USERNAME", f"{username}")
-    config.USERNAME = username
+    set_key(str(ENV_FILE), "USERNAME", username)
     logger.info(f"User {username} saved as owner")
-    print(f"Thanks {username}")
+    print(f"Thanks {username}! Login to your Postgres Server!")
 
 
 def pull_inventory():

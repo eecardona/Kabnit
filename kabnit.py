@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFontDatabase, QPalette
-from bloolib import check_user, postgres_check
+from bloolib import set_user
+from pathlib import Path
 import logging
 import config
 import gui
@@ -40,7 +41,8 @@ def main():
     else:
         font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
 
-    if config.INITIAL_SETUP == False:
+    if not Path(".env").is_file():
+        set_user()
         login_window = gui.LoginDialog()
         main_window = None
 
