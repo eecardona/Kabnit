@@ -48,10 +48,10 @@ uv run python kabnit.py
 ## FAQ
 
 * **I recieved an error related to Qt6**
-You may need to install QT6 directly on your platform. On some ubuntu systems installing 
-```
-command to run if program contains helper info
-```
+- You may need to install QT6 directly on your platform. On some ubuntu systems installing 
+
+* **How do I contribute?**
+- Currently, I do not have a setup for promoting others helping. I am still really new to git and programming. Best thing currently is using it and creating issues. I want to make that process easier eventually promise!
 
 ## Authors
 
